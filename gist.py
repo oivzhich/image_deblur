@@ -1,6 +1,6 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def makeHistogram(file_path, result_path):
@@ -19,9 +19,8 @@ def makeHistogram(file_path, result_path):
     plt.savefig(result_path)
 
 
-def makeHistogramOpenCV(file_path, result_path):
-    # чтение файла с диска
-    image = cv2.imread(file_path)
+def makeHistogramOpenCV(image, result_path):
+    if image is None: return
     # вычисление гистограммы
     hist_full = cv2.calcHist([image], [0], None, [256], [0, 256])
     # создание графика гистограммы

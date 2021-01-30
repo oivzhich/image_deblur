@@ -1,7 +1,9 @@
 from tkinter import *
 from tkinter import filedialog
 
+import numpy as np
 from PIL import Image, ImageTk
+
 from gist import makeHistogramOpenCV
 from spectrum import makeMagnituneSpectrumOpenCV
 from weiner import deblur
@@ -16,6 +18,7 @@ class App:
         self.restoredPath = 'resources/restored.jpg'
         self.root = Tk()
         self.root.title("ПРОГРАММА ВОССТАНОВЛЕНИЯ РАСФОКУСИРОВАННОГО ИЗОБРАЖЕНИЯ")
+        self.dsize = (500, 400)
 
         Button(text="Выбрать картинку:", command=self.select_image).grid(row=0, column=0,
                                                                          sticky=W,
@@ -27,9 +30,23 @@ class App:
 
         self.loadImage()
 
+        self.psf_var = DoubleVar()
+        self.psf_var.set(13)
+        self.psf_scale = Scale(self.root, label="Значение радиуса PSF", orient=HORIZONTAL, length=300, from_=0, to=100,
+                               tickinterval=10, variable=self.psf_var, resolution=1,
+                               command=self.psfScaleHandler).grid(
+            row=2, column=0)
+
+        self.noise_var = DoubleVar()
+        self.noise_var.set(25)
+
+        self.noise_scale = Scale(self.root, label="Значение SNR", orient=HORIZONTAL, length=300, from_=0, to=100,
+                                 tickinterval=10, variable=self.noise_var, resolution=1,
+                                 command=self.noiseScaleHandler).grid(
+            row=2, column=1)
+
         Label(text="Восстановленное изображение:").grid(
-            row=2, column=0, sticky=W,
-            padx=10, pady=10)
+            row=4, column=0, sticky=W, pady=10, padx=10)
 
         self.root.mainloop()
 
@@ -42,59 +59,61 @@ class App:
         # only show the image if they chose something
         if file_path:
             self.loadImage(file_path)
-        self.restoreImage(file_path)
+        self.restoreImage(self.originalImage, self.noise_var.get(), self.psf_var.get())
 
-    def restoreImage(self, file_path="resources/file.jpg"):
-        deblur(file_path, self.restoredPath)
-        self.restoredImage = Image.open(self.restoredPath)
-        self.restoredImage = self.restoredImage.resize((500, 400), Image.ANTIALIAS)
-        self.restoredPhoto = ImageTk.PhotoImage(self.restoredImage)
+    def noiseScaleHandler(self, noise_var):
+        self.restoreImage(self.originalImage, noise_var, self.psf_var.get())
 
-        self.createCanvasWithImage(self.restoredPhoto, 2, 1)
+    def psfScaleHandler(self, psf_var):
+        self.restoreImage(self.originalImage, self.noise_var.get(), psf_var)
 
-        # makeHistogram(self.restoredPath, self.hist2Path)
-        makeHistogramOpenCV(self.restoredPath, self.hist2Path)
-        self.hist2Image = Image.open(self.hist2Path)
-        self.hist2Image = self.hist2Image.resize((500, 400), Image.ANTIALIAS)
-        self.hist2Photo = ImageTk.PhotoImage(self.hist2Image)
+    def _getPILImage(self, file_path):
+        # чтение файла с диска
+        pil_image = Image.open(file_path).convert('RGB')
+        return pil_image.resize(self.dsize, Image.ANTIALIAS)
 
-        self.createCanvasWithImage(self.hist2Photo, 2, 2)
+    def _getOpenCVImage(self, pil_image):
+        # Convert RGB to BGR
+        return np.array(pil_image)[:, :, ::-1].copy()
 
-        # ФЧХ
-        makeMagnituneSpectrumOpenCV(self.restoredPath, self.sp2Path)
-        self.spectrum2Image = Image.open(self.sp2Path)
-        self.spectrum2Image = self.spectrum2Image.resize((500, 400), Image.ANTIALIAS)
-        self.spectrum2Photo = ImageTk.PhotoImage(self.spectrum2Image)
-
-        self.createCanvasWithImage(self.spectrum2Photo, 2, 3)
-
-    def loadImage(self, file_path="resources/dummy.jpg"):
-        self.originalImage = Image.open(file_path)
-        self.originalImage = self.originalImage.resize((500, 400), Image.ANTIALIAS)
-        self.photo1 = ImageTk.PhotoImage(self.originalImage)
-
-        self.createCanvasWithImage(self.photo1, 1, 1)
-
-        # Гистограмма изображения
-        makeHistogramOpenCV(file_path, self.hist1Path)
-        self.hist1Image = Image.open(self.hist1Path)
-        self.hist1Image = self.hist1Image.resize((500, 400), Image.ANTIALIAS)
-        self.hist1 = ImageTk.PhotoImage(self.hist1Image)
-
-        self.createCanvasWithImage(self.hist1, 1, 2)
-
-        # ФЧХ
-        makeMagnituneSpectrumOpenCV(file_path, self.sp1Path)
-        self.spectrum1Image = Image.open(self.sp1Path)
-        self.spectrum1Image = self.spectrum1Image.resize((500, 400), Image.ANTIALIAS)
-        self.spectrum1Photo = ImageTk.PhotoImage(self.spectrum1Image)
-
-        self.createCanvasWithImage(self.spectrum1Photo, 1, 3)
-
-    def createCanvasWithImage(self, image, row, column):
-        canvas = Canvas(height=500, width=500)
+    def _createCanvasWithImage(self, image, row, column):
+        canvas = Canvas(height=400, width=500)
         canvas.create_image(0, 0, anchor='nw', image=image)
         canvas.grid(row=row, column=column)
+        return image
+
+    def loadImage(self, file_path="resources/dummy.jpg"):
+        pil_image = self._getPILImage(file_path)
+        self.originalImage = self._getOpenCVImage(pil_image)
+        self.photo1 = self._createCanvasWithImage(ImageTk.PhotoImage(pil_image), 1, 1)
+
+        # Гистограмма изображения
+        makeHistogramOpenCV(self.originalImage, self.hist1Path)
+        self.hist1Image = self._getPILImage(self.hist1Path)
+        self.hist1 = self._createCanvasWithImage(ImageTk.PhotoImage(self.hist1Image), 1, 2)
+
+        # ФЧХ
+        makeMagnituneSpectrumOpenCV(self.originalImage, self.sp1Path)
+        self.spectrum1Image = self._getPILImage(self.sp1Path)
+        self.sp1 = self._createCanvasWithImage(ImageTk.PhotoImage(self.spectrum1Image), 1, 3)
+
+    def restoreImage(self, original_image, noise_var, psf_var):
+        if original_image is None: return
+        deblur(original_image, self.restoredPath, int(noise_var), int(psf_var))
+
+        pil_image = self._getPILImage(self.restoredPath)
+        self.restoredImage = self._getOpenCVImage(pil_image)
+        self.photo2 = self._createCanvasWithImage(ImageTk.PhotoImage(pil_image), 3, 1)
+
+        # Гистограмма изображения
+        makeHistogramOpenCV(self.restoredImage, self.hist2Path)
+        self.hist2Image = self._getPILImage(self.hist2Path)
+        self.hist2 = self._createCanvasWithImage(ImageTk.PhotoImage(self.hist2Image), 3, 2)
+
+        # ФЧХ
+        makeMagnituneSpectrumOpenCV(self.restoredImage, self.sp2Path)
+        self.spectrum2Image = self._getPILImage(self.sp2Path)
+        self.sp2 = self._createCanvasWithImage(ImageTk.PhotoImage(self.spectrum2Image), 3, 3)
 
 
 app = App()
