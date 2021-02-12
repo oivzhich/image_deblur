@@ -4,7 +4,7 @@ from tkinter import filedialog
 import numpy as np
 from PIL import Image, ImageTk
 
-from gist import makeHistogramOpenCV
+from histogram import makeHistogramOpenCV
 from spectrum import makeMagnituneSpectrumOpenCV
 from weiner import deblur
 
@@ -28,7 +28,7 @@ class App:
             row=1, column=0, sticky=W,
             padx=10, pady=10)
 
-        self.loadImage()
+        self.loadDefault()
 
         self.psf_var = DoubleVar()
         self.psf_var.set(13)
@@ -51,15 +51,15 @@ class App:
         self.root.mainloop()
 
     def select_image(self):
-        # ask the user for the filename
+        # Открытие файлового диалога
         file_path = filedialog.askopenfilename(filetypes=(
             ("all files", "*.*"), ("jpeg files", "*.jpg"), ("png files", "*.png"), ("gif files", "*.gif"),
             ("bmp files", "*.bmp")))
 
-        # only show the image if they chose something
+        # Отображаем изображение, толлько если оно выбрано
         if file_path:
             self.loadImage(file_path)
-        self.restoreImage(self.originalImage, self.noise_var.get(), self.psf_var.get())
+            self.restoreImage(self.originalImage, self.noise_var.get(), self.psf_var.get())
 
     def noiseScaleHandler(self, noise_var):
         self.restoreImage(self.originalImage, noise_var, self.psf_var.get())
@@ -82,7 +82,12 @@ class App:
         canvas.grid(row=row, column=column)
         return image
 
-    def loadImage(self, file_path="resources/dummy.jpg"):
+    def loadDefault(self):
+        pil_image = self._getPILImage("resources/dummy.jpg")
+        self.originalImage = self._getOpenCVImage(pil_image)
+        self.photo1 = self._createCanvasWithImage(ImageTk.PhotoImage(pil_image), 1, 1)
+
+    def loadImage(self, file_path):
         pil_image = self._getPILImage(file_path)
         self.originalImage = self._getOpenCVImage(pil_image)
         self.photo1 = self._createCanvasWithImage(ImageTk.PhotoImage(pil_image), 1, 1)

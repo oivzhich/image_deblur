@@ -47,11 +47,7 @@ def deblur(original_image, restored_path, noise_var, psf_var):
     # вычисление спектра мощности исходного изображения
     psf = defocus_kernel(radius)
 
-    # if defocus:
-    #     psf = defocus_kernel(d)
-    # else:
-    #     psf = motion_kernel(ang, d)
-
+    # наложение PSF на исходное изображение
     psf /= psf.sum()
     psf_pad = np.zeros_like(img)
     kh, kw = psf.shape
@@ -66,4 +62,5 @@ def deblur(original_image, restored_path, noise_var, psf_var):
     res = cv2.idft(RES, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)
     res = np.roll(res, -kh // 2, 0)
     res = np.roll(res, -kw // 2, 1)
+    # cохранение восстановленного изображения в файл
     write_image(restored_path, res)
